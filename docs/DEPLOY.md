@@ -1,6 +1,8 @@
 # Deploying the Demo App
 
-How to put `app/streamlit_app.py` on Streamlit Community Cloud from the public GitHub repository. These steps are for Paulo. Nothing here was run: the repository has no remote yet, and the app has not been deployed.
+How to put `app/streamlit_app.py` on Streamlit Community Cloud from the public GitHub repository. These steps are for Paulo.
+
+**Deployed** at https://accountability-harness.streamlit.app/, from the `main` branch of `pmcavallo/accountability-harness`, with no secrets.
 
 **The app needs no secrets.** It calls no AI model, reads no API key or environment variable, and makes no network calls. Leave the Secrets box empty. If a deploy screen ever asks for a key, something is wrong: stop and check what changed. A test (`tests/test_app.py`) fails if the app imports a model SDK or reads a key.
 
@@ -30,7 +32,7 @@ The harness itself has no dependencies, and the app loads it from `src/` directl
 
 ## After deploying
 
-- Replace the placeholder line in the README's "Demo app" section with the app's URL.
+- Put the app's URL in the README: near the top and in the "Demo app" section (done for the deployment above).
 - `REPO_BLOB_URL` near the top of `app/streamlit_app.py` is already set to `https://github.com/pmcavallo/accountability-harness/blob/main`, so the Findings page links to `experiments/RESULTS.md` and `docs/WHAT-THIS-DOES-NOT-PROVE.md`. Check that both links open once the repository is public.
 - Commit the change; Community Cloud redeploys on every push to the deployed branch.
 

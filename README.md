@@ -4,6 +4,8 @@ A small Python library for the person who deploys an AI agent. Before the run, y
 
 All demo, test and experiment data in this repository is synthetic.
 
+Live demo: https://accountability-harness.streamlit.app/ (synthetic data, no AI model runs in the hosted app)
+
 ## The three questions
 
 Every report opens with a summary for the owner (approval, review status, changes by reversibility, what needs attention, and whether the log verified), then answers:
@@ -141,7 +143,7 @@ pip install -e ".[app]"            # or: pip install -r app/requirements.txt
 streamlit run app/streamlit_app.py
 ```
 
-Hosted version: _URL to be added after deployment._
+Hosted version: https://accountability-harness.streamlit.app/
 
 ![Run a scenario: the injected email obeyed in observe mode, flagged and sent](docs/images/app-run-a-scenario.jpg)
 
