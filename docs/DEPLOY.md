@@ -4,7 +4,7 @@ How to put `app/streamlit_app.py` on Streamlit Community Cloud from the public G
 
 **Deployed** at https://accountability-harness.streamlit.app/, from the `main` branch of `pmcavallo/accountability-harness`, with no secrets.
 
-**The app needs no secrets.** It calls no AI model, reads no API key or environment variable, and makes no network calls. Leave the Secrets box empty. If a deploy screen ever asks for a key, something is wrong: stop and check what changed. A test (`tests/test_app.py`) fails if the app imports a model SDK or reads a key.
+**The app needs no secrets, and Streamlit Secrets must stay empty.** The hosted app calls no AI model and makes no network calls. It has no live mode by design: the "Live model (local)" page appears only when `AH_LIVE=1` and `AH_ANTHROPIC_API_KEY` are both set, and `app/requirements.txt` does not include `anthropic`. Never add either variable as a secret: Streamlit Community Cloud exposes top-level secrets as environment variables, so doing so would show the live page (which would then fail, because the package is not installed). If a deploy screen ever asks for a key, something is wrong: stop and check what changed. Tests in `tests/test_app.py` fail if any app file other than `app/live_mode.py` imports a model SDK or reads an environment variable, and if `live_mode.py` imports `anthropic` at module level.
 
 ## Settings
 

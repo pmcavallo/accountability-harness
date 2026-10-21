@@ -4,6 +4,8 @@ The harness and its experiments are evidence of a small set of controls, built a
 
 **One model, one synthetic scenario, small n.** The real-model results come from Claude Haiku 5.5 on one fictional inbox, with five hand-written injection emails and two system prompts: 100 runs, on one date. They say nothing reliable about other models, other tasks, stronger attacks, or rare failures. Zero attempts in 100 runs does not mean the true rate is zero.
 
+**A live demo run is one run.** The app's local live mode shows the harness around one real model on one run, with one of two prompts. Whatever that run does, it is not evidence about other models, other prompts or other runs of the same model.
+
 **No real-model run exercised flagging or blocking.** The model never attempted the outside send, under either prompt. So the 100 real runs show what the model did, and that the harness recorded and classified it. They do not show the harness catching or stopping a real model.
 
 **Flag and block behavior is shown by scripted scenarios and tests.** The `violation`, `mutation`, `enforce`, `argument` and `argument enforce` demo scenarios, and the offline test suite, show that out-of-scope calls are flagged in observe mode and never run in enforce mode. These are scripted calls, not a model choosing to make them.

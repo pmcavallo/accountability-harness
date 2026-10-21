@@ -136,7 +136,11 @@ Each scenario runs through the core and, if `langchain-core` is installed, throu
 
 ## Demo app
 
-A small Streamlit app in `app/` shows the same demo in a browser: run a scenario in either mode, observe and enforce side by side, the governed scope, the change comparison, the headline findings and a tamper check. It runs only the scripted scenarios, the recorded replay and committed files. No AI model runs in it, it reads no key and it needs no network access. All data is synthetic.
+A small Streamlit app in `app/` shows the same demo in a browser: run a scenario in either mode, observe and enforce side by side, the governed scope, the change comparison, the headline findings and a tamper check. It runs only the scripted scenarios, the recorded replay and committed files. All data is synthetic.
+
+**Playground.** The "Build your own test" page lets you edit the approved scope (allowed tools, which tools change something, whether changes are allowed, how each change can be undone, a recipient-domain rule for `send_email`, observe or enforce) and the script (which calls run, and the `send_email` recipient), then run it. It shows what was sent, the report, the edited scope as a TOML file with its fingerprint, and a comparison with the approved scope. Any edit makes the scope an unapproved version, and the findings say so: changing a scope is a governance decision, not a configuration tweak. No model is called.
+
+**The hosted app never runs a model.** It reads no key and needs no network access. The only page that calls a model is the local live mode below, which the hosted app does not have.
 
 ```bash
 pip install -e ".[app]"            # or: pip install -r app/requirements.txt
@@ -152,6 +156,26 @@ Hosted version: https://accountability-harness.streamlit.app/
 ![Change comparison: calendar holds in 4 of 50 runs against 50 of 50](docs/images/app-change-comparison.jpg)
 
 Deployment steps are in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+## Live mode (local only)
+
+On your own machine, you can switch on one extra page, "Live model (local)", which runs a real model (`claude-haiku-5-5`) as the inbox assistant through the harness, using the loop in `experiments/agent_loop.py`. You choose the neutral or permissive prompt, the approved scope or the one from the playground, and observe or enforce. The page shows the tool calls, emails actually sent, blocked calls, the report, the chain status, and the tokens and estimated cost from the API's usage fields.
+
+- **It is off by default.** The page exists only when both `AH_LIVE=1` and `AH_ANTHROPIC_API_KEY` are set. The key variable is deliberately not `ANTHROPIC_API_KEY`, so a key set for this demo cannot change how other tools on your machine are billed. `app/live_mode.py` is the only file that reads environment variables or uses the `anthropic` package, and it imports it only when a run starts.
+- **It costs money.** A red banner says so. Each run needs a click on "Run with real model"; nothing runs on page load or refresh, and a session allows at most 5 live runs. At $0.10 per million input tokens and $0.50 per million output tokens, the estimate is about $0.0015 for a typical run and at most about $0.0072 (15 tool calls, 2,048 output tokens per reply). These are estimates; the page shows the actual token counts after each run.
+- **The hosted app has no live mode.** `app/requirements.txt` lists only `streamlit`, so the hosted app cannot even import `anthropic`, and its Secrets stay empty.
+
+To run it (PowerShell). Use a separate terminal used only for this, and never start `claude` in it:
+
+```powershell
+cd C:\Users\pmcav\Projects\accountability_harness\public
+pip install -e ".[experiments,app]"
+$env:AH_LIVE = "1"
+$env:AH_ANTHROPIC_API_KEY = "<your key>"
+streamlit run app/streamlit_app.py
+```
+
+Close that terminal when done.
 
 ## Findings from 100 real-model runs
 

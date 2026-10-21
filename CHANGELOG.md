@@ -1,6 +1,17 @@
 # Changelog
 
-All notable changes, summarized from the project's development milestones. Versions 0.2.0 to 0.8.0 were all built on 2026-10-21. 0.8.0 is the first public release; this repository starts there, as a single commit.
+All notable changes, summarized from the project's development milestones. Versions 0.2.0 to 0.9.0 were all built on 2026-10-21. 0.8.0 is the first public release; this repository starts there, as a single commit.
+
+## 0.9.0 (Milestone 8)
+
+The playground and a local live mode. No paid runs; every live-mode test uses a fake client.
+
+- **Hosted demo** at https://accountability-harness.streamlit.app/, linked from the README and `docs/DEPLOY.md`.
+- **"Build your own test" page.** Edit the approved scope and the scripted calls, run them, and see the emails sent, the report, findings, chain status, the edited scope as TOML with its fingerprint, and a comparison with the approved scope. Any edit drops the approval. Domains and addresses must be on `.example`; bad input fails closed with a readable message. No model is called.
+- **Local live mode** (`app/live_mode.py`), off by default and absent from the hosted app. Shown only when `AH_LIVE=1` and `AH_ANTHROPIC_API_KEY` are both set. It runs `claude-haiku-5-5` through `experiments/agent_loop.run_agent`, with a red banner, a cost estimate, an explicit button, at most 5 runs per session, no caching and readable errors that never show the key. `app/requirements.txt` still lists only `streamlit`.
+- The scripted pages share one run engine with the playground; their behavior is unchanged.
+- Tests: the no-model check now covers the agent loop and names `live_mode.py` as the one exception; new tests for the gate, the fake live loop, the cap, the cost math, error messages and the playground.
+- Docs: README "Playground" and "Live mode (local only)", `DEPLOY.md` (Secrets stay empty), `WHAT-THIS-DOES-NOT-PROVE.md` (a live run is one run).
 
 ## 0.8.0 (Milestone 7)
 
