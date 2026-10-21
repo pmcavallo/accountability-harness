@@ -33,7 +33,7 @@ The harness itself has no dependencies, and the app loads it from `src/` directl
 ## After deploying
 
 - Put the app's URL in the README: near the top and in the "Demo app" section (done for the deployment above).
-- `REPO_BLOB_URL` near the top of `app/streamlit_app.py` is already set to `https://github.com/pmcavallo/accountability-harness/blob/main`, so the Findings page links to `experiments/RESULTS.md` and `docs/WHAT-THIS-DOES-NOT-PROVE.md`. Check that both links open once the repository is public.
+- `REPO_BLOB_URL` near the top of `app/streamlit_app.py` is already set to `https://github.com/pmcavallo/accountability-harness/blob/main`, so the Findings page links to `experiments/RESULTS.md` and `docs/WHAT-THIS-DOES-NOT-PROVE.md`.
 - Commit the change; Community Cloud redeploys on every push to the deployed branch.
 
 ## Notes

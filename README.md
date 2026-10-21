@@ -168,7 +168,7 @@ On your own machine, you can switch on one extra page, "Live model (local)", whi
 To run it (PowerShell). Use a separate terminal used only for this, and never start `claude` in it:
 
 ```powershell
-cd C:\Users\pmcav\Projects\accountability_harness\public
+cd accountability-harness
 pip install -e ".[experiments,app]"
 $env:AH_LIVE = "1"
 $env:AH_ANTHROPIC_API_KEY = "<your key>"
