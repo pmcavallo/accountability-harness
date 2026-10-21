@@ -24,7 +24,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "demo"))
 
+sys.path.insert(0, str(ROOT / "app"))
+
 import inbox_triage as demo  # noqa: E402
+import live_mode  # noqa: E402  (no model SDK at import; see live_mode.py)
 from accountability_harness import (  # noqa: E402
     ArgRule,
     Harness,
@@ -540,14 +543,78 @@ def page_playground() -> None:
         st.markdown(comparison)
 
 
+# -- live model (local only) ---------------------------------------------
+
+LIVE_PAGE = "Live model (local)"
+
+
+def page_live() -> None:
+    st.error("LIVE: a real model is called and your API credits are charged.")
+    st.header(LIVE_PAGE)
+    st.write(
+        f"Runs `{live_mode.MODEL}` as the inbox assistant through the harness, with the planted email in the "
+        f"inbox. At most {live_mode.agent_loop.MAX_STEPS} tool calls and {live_mode.agent_loop.MAX_TOKENS} "
+        "output tokens per reply. This page exists only in a local run with live mode switched on."
+    )
+    prompt = st.radio("System prompt", list(live_mode.PROMPTS), horizontal=True, key="live-prompt")
+    st.caption(live_mode.PROMPTS[prompt])
+    choices = ["approved"] + (["playground"] if "pg-scope" in st.session_state else [])
+    which = st.radio(
+        "Scope",
+        choices,
+        format_func={"approved": "The approved inbox-assistant scope", "playground": "The scope from the last playground run"}.get,
+        horizontal=True,
+        key="live-scope",
+    )
+    if len(choices) == 1:
+        st.caption("Run a test on the 'Build your own test' page to use its scope here.")
+    scope = st.session_state["pg-scope"] if which == "playground" else demo.SCOPE
+    mode = st.radio("Mode", ["observe", "enforce"], horizontal=True, key="live-mode")
+    high = live_mode.cost(live_mode.EST_MAX_INPUT, live_mode.EST_MAX_OUTPUT)
+    typical = live_mode.cost(live_mode.TYPICAL_INPUT, live_mode.TYPICAL_OUTPUT)
+    st.info(
+        f"Estimated cost per run: about ${typical:.4f} for a typical run, at most about ${high:.4f}. "
+        f"An estimate at ${live_mode.PRICE_PER_MTOK['input']:.2f} per million input tokens and "
+        f"${live_mode.PRICE_PER_MTOK['output']:.2f} per million output tokens."
+    )
+    used = st.session_state.get("live-runs", 0)
+    st.caption(f"{used} of {live_mode.MAX_LIVE_RUNS} live runs used in this session.")
+    capped = used >= live_mode.MAX_LIVE_RUNS
+    if capped:
+        st.warning(f"Session limit reached: {live_mode.MAX_LIVE_RUNS} live runs. Restart the app to run more.")
+    if st.button("Run with real model", type="primary", disabled=capped, key="live-run"):
+        st.session_state["live-runs"] = used + 1  # counted before the call, so failed runs count too
+        with st.spinner("Calling the model..."):
+            st.session_state["live-last"] = live_mode.run_live(scope, mode, prompt)
+        st.rerun()  # redraw with the new count; the rerun shows the stored result and calls nothing
+    result = st.session_state.get("live-last")
+    if not result:
+        return
+    if "error" in result:
+        st.error(f"Live run failed: {result['error']}")
+        return
+    st.subheader("Last live run")
+    columns = st.columns(2)
+    columns[0].metric("Tool calls made", len(result["calls"]))
+    columns[1].metric("Blocked calls", result["blocked"])
+    st.write(
+        f"Model reported: `{result['model']}`. Tokens: {result['input_tokens']:,} in, {result['output_tokens']:,} out, "
+        f"over {result['api_calls']} API call(s). Estimated cost: ${result['cost']:.4f}."
+    )
+    show_result(result)
+
+
 # -- layout ---------------------------------------------------------------
 
 st.set_page_config(page_title="Agent Accountability Harness", layout="wide")
-st.info(HEADER)
 st.sidebar.title("Agent Accountability Harness")
-page = st.sidebar.radio("Page", PAGES)
+# The live page exists only when the local gate is open; otherwise it is not listed at all.
+page = st.sidebar.radio("Page", PAGES + ([LIVE_PAGE] if live_mode.gate_open() else []))
 st.sidebar.caption(f"Governance checks use the demo date, {demo.DEMO_DATE}.")
+if page != LIVE_PAGE:
+    st.info(HEADER)  # the live page shows its own red banner instead
 {
+    LIVE_PAGE: page_live,
     "Run a scenario": page_run,
     "Observe vs enforce": page_side_by_side,
     "The scope": page_scope,
