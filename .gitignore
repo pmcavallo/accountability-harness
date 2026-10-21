@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+audit_logs/
+build/
+dist/
+.scratch/
+.env
+experiments/audit_logs/
+experiments/runs/
+CLAUDE.local.md

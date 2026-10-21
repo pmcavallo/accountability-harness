@@ -1,0 +1,4 @@
+# For Streamlit Community Cloud. The app needs no secrets and no network access.
+# The harness itself has no dependencies; the app loads it from ../src.
+# pandas comes with streamlit.
+streamlit>=1.66,<2

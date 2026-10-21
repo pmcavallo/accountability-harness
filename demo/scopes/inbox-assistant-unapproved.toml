@@ -1,0 +1,36 @@
+# Synthetic, fictional scope for the Tallow Lane Events demo.
+name = "inbox-assistant-unapproved"
+description = "A draft of the inbox scope that was put into use before anyone approved it. Same tools as inbox-assistant."
+version = "0.3-draft"
+owner = "Operations lead, Tallow Lane Events"
+# No approver and no approval date: nobody signed off.
+review_by = 2026-09-30
+change_note = "Draft copied from the pilot; review date not updated."
+allowed_tools = ["read_inbox", "read_email", "summarize_thread", "draft_reply", "place_calendar_hold", "add_client_contact"]
+allowed_data_sources = ["inbox"]
+mutations_allowed = true
+
+# One line per allowed tool: why the agent needs it.
+[rationale]
+read_inbox = "Needs to see which emails arrived."
+read_email = "Needs to read an email before it can act on it."
+summarize_thread = "Lets the operations lead skim long threads."
+draft_reply = "Prepares replies for a person to review and send."
+place_calendar_hold = "Clients ask for date holds; a hold expires on its own after 48 hours."
+
+# How each change can be undone, declared before the run.
+[mutating_tools.draft_reply]
+kind = "reversible"
+how = "Delete the draft."
+
+[mutating_tools.place_calendar_hold]
+kind = "reversible"
+how = "Release the hold on the company calendar."
+window = "until the hold expires, 48 hours after it is placed"
+
+[mutating_tools.send_email]
+kind = "irreversible"
+how = "Send a correction to the same recipient; the original cannot be recalled."
+
+# Deliberately left undeclared: nobody wrote down how to undo it.
+[mutating_tools.add_client_contact]

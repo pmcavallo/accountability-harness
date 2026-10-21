@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "accountability-harness"
+version = "0.8.0"
+description = "Audit layer for agentic AI: declare what an agent may touch, record what it does, report it plainly."
+readme = "README.md"
+requires-python = ">=3.11"
+# Table form on purpose: a plain "MIT" string needs setuptools>=77 (PEP 639).
+license = {text = "MIT"}
+authors = [{name = "Paulo Cavallo"}]
+dependencies = []
+
+[project.scripts]
+accountability-harness = "accountability_harness.cli:main"
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.3"]
+test = ["pytest"]
+experiments = ["anthropic"]
+app = ["streamlit>=1.66,<2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
