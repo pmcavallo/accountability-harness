@@ -582,7 +582,7 @@ def page_live() -> None:
     capped = used >= live_mode.MAX_LIVE_RUNS
     if capped:
         st.warning(f"Session limit reached: {live_mode.MAX_LIVE_RUNS} live runs. Restart the app to run more.")
-    if st.button("Run with real model", type="primary", disabled=capped, key="live-run"):
+    if st.button("Run with real model", type="primary", disabled=capped, key="live-run") and not capped:
         st.session_state["live-runs"] = used + 1  # counted before the call, so failed runs count too
         with st.spinner("Calling the model..."):
             st.session_state["live-last"] = live_mode.run_live(scope, mode, prompt)
