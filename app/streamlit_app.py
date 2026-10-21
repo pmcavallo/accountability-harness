@@ -25,8 +25,18 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "demo"))
 
 import inbox_triage as demo  # noqa: E402
-from accountability_harness import Harness, fingerprint, load_scope, render_report  # noqa: E402
+from accountability_harness import (  # noqa: E402
+    ArgRule,
+    Harness,
+    Reversibility,
+    Scope,
+    email_domain_in,
+    fingerprint,
+    load_scope,
+    render_report,
+)
 from accountability_harness.audit import verify_text  # noqa: E402
+from accountability_harness.compare import compare  # noqa: E402
 from accountability_harness.governance import findings  # noqa: E402
 from accountability_harness.report import chain_status  # noqa: E402
 
@@ -42,6 +52,7 @@ PAGES = [
     "Change comparison",
     "Findings",
     "Tamper check",
+    "Build your own test",
 ]
 
 SCENARIO_LABELS = {
@@ -76,10 +87,16 @@ def run(scenario: str, mode: str) -> dict:
     scope, _, steps = demo.SCENARIOS[scenario]
     if scenario == "replay":
         steps = [(tool, {**args, "draft": HIDDEN_DRAFT} if "draft" in args else args) for tool, args in steps]
-    with _LOCK, tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory() as tmp:
+        return execute(scope, mode, steps, demo.SCENARIO_INBOX.get(scenario, demo.EMAILS), demo.agent_name(scenario, mode), tmp)
+
+
+def execute(scope: Scope, mode: str, steps: list, inbox: list, agent: str, log_dir: str) -> dict:
+    """Run scripted tool calls through the harness, writing the log to log_dir."""
+    with _LOCK:
         demo.reset_outside_world()
-        demo.set_inbox(demo.SCENARIO_INBOX.get(scenario, demo.EMAILS))
-        harness = Harness(scope, log_dir=tmp, agent_name=demo.agent_name(scenario, mode), mode=mode)
+        demo.set_inbox(inbox)
+        harness = Harness(scope, log_dir=log_dir, agent_name=agent, mode=mode)
         tools = {name: harness.wrap(fn, on_block="return") for name, fn in demo.TOOLS.items()}
         for tool, args in steps:
             tools[tool](**args)
@@ -162,7 +179,11 @@ def page_run() -> None:
             "The tool calls one real model run made, replayed from demo/replay-trace.json. "
             "The draft text the model wrote is hidden here."
         )
-    result = run(scenario, mode)
+    show_result(run(scenario, mode))
+
+
+def show_result(result: dict) -> None:
+    """Emails sent, the callouts, the owner summary, then the three questions."""
     parts = sections(result["report"])
     st.metric("Emails actually sent", result["sent"])
     callouts(result)
@@ -335,6 +356,190 @@ def page_tamper() -> None:
     )
 
 
+# -- playground: build your own test ------------------------------------
+
+KIND_CHOICES = ["reversible", "compensable", "irreversible", "undeclared"]
+# Only reserved example domains, so every address in the demo stays synthetic.
+DOMAIN = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+example$")
+ADDRESS = re.compile(r"^[a-z0-9._%+-]{1,64}@(?P<domain>[a-z0-9.-]{1,200})$")
+
+
+def parse_domains(text: str) -> list[str]:
+    """Comma-separated domains, checked. Raises ValueError with a readable reason."""
+    domains = [d.strip().lower().lstrip("@") for d in text.split(",") if d.strip()]
+    if not domains:
+        raise ValueError("The recipient rule is on but lists no domain. Add one, or switch the rule off.")
+    for d in domains:
+        if not DOMAIN.match(d):
+            raise ValueError(f"'{d}' is not accepted: use a domain ending in .example, such as tallowlane.example.")
+    return domains
+
+
+def parse_address(text: str) -> str:
+    """One email address on a .example domain. Raises ValueError with a readable reason."""
+    address = text.strip().lower()
+    match = ADDRESS.match(address)
+    if not match or not DOMAIN.match(match["domain"]):
+        raise ValueError(f"'{text.strip()}' is not accepted: use one address on a .example domain, such as team@tallowlane.example.")
+    return address
+
+
+def build_scope(allowed: list[str], mutating: list[str], mutations_allowed: bool, kinds: dict[str, str], domains: list[str] | None) -> Scope:
+    """The edited scope. If it differs from the approved one in any way, it
+    loses its approval: nobody has approved this version."""
+    approved = demo.SCOPE
+    declared: dict[str, Reversibility | None] = {}
+    for tool in mutating:
+        old = approved.mutating_tools.get(tool)
+        if kinds[tool] == "undeclared":
+            declared[tool] = None
+        elif old and old.kind == kinds[tool]:
+            declared[tool] = old
+        else:
+            declared[tool] = Reversibility(kinds[tool], "Declared in the playground; nobody wrote down how to undo it.")
+    rules = []
+    if domains:
+        check = email_domain_in(*domains)
+        rules.append(ArgRule("send_email", "to", check, f"Email may only go to {', '.join(domains)} addresses"))
+    fields = dict(
+        name=approved.name,
+        allowed_tools=set(allowed),
+        allowed_data_sources=set(approved.allowed_data_sources),
+        mutating_tools=declared,
+        mutations_allowed=mutations_allowed,
+        arg_rules=rules,
+        rationale={t: r for t, r in approved.rationale.items() if t in allowed},
+        owner=approved.owner,
+        review_by=approved.review_by,
+    )
+    same = Scope(**fields, description=approved.description, approver=approved.approver,
+                 approved_on=approved.approved_on, version=approved.version, change_note=approved.change_note)
+    if fingerprint(same.to_dict()) == fingerprint(approved.to_dict()):
+        return same
+    return Scope(**fields, description=approved.description + " Edited in the playground.",
+                 version=f"{approved.version}-edited", change_note="Edited in the playground. Not approved by anyone.")
+
+
+def scope_toml(scope: Scope, domains: list[str] | None) -> str:
+    """The scope as a TOML scope file that load_scope reads back."""
+    d = scope.to_dict()
+    gov = d["governance"]
+    q = json.dumps  # a JSON string or list of strings is valid TOML
+    lines = ["# Built in the playground. Synthetic.", f"name = {q(d['name'])}", f"description = {q(d['description'])}"]
+    for key in ("version", "owner", "approver", "approved_on", "review_by", "change_note"):
+        if gov.get(key):
+            lines.append(f"{key} = {gov[key]}" if key in ("approved_on", "review_by") else f"{key} = {q(gov[key])}")
+    lines += [
+        f"allowed_tools = {q(d['allowed_tools'])}",
+        f"allowed_data_sources = {q(d['allowed_data_sources'])}",
+        f"mutations_allowed = {'true' if d['mutations_allowed'] else 'false'}",
+        "",
+        "[rationale]",
+        *[f"{t} = {q(r)}" for t, r in d["rationale"].items()],
+    ]
+    for tool, decl in d["reversibility"].items():
+        lines += ["", f"[mutating_tools.{tool}]"]
+        if decl:
+            lines += [f"kind = {q(decl['kind'])}", f"how = {q(decl['how'])}"]
+            lines += [f"window = {q(decl['window'])}"] if decl.get("window") else []
+    if domains:
+        rule = d["arg_rules"][0]
+        lines += ["", "[[arg_rules]]", 'tool = "send_email"', 'arg = "to"', 'check = "email_domain_in"',
+                  f"values = {q(domains)}", f"description = {q(rule['description'])}"]
+    return "\n".join(lines) + "\n"
+
+
+def describe_call(tool: str, args: dict) -> str:
+    short = ", ".join(f"{k}={str(v)[:30]!r}" for k, v in args.items())
+    return f"{tool}({short})"
+
+
+def page_playground() -> None:
+    st.header("Build your own test")
+    st.write(
+        "Start from the approved `inbox-assistant` scope, change what the agent may do, pick which scripted "
+        "calls it makes, and run it. Nothing here calls a model: the calls are a fixed script. Any change to "
+        "the scope makes it a new, unapproved version, because changing a scope is a governance decision, "
+        "not a configuration tweak."
+    )
+    approved = demo.SCOPE.to_dict()
+    tools = list(demo.TOOLS)
+    st.subheader("1. The scope")
+    st.markdown("**Allowed tools**")
+    columns = st.columns(4)
+    allowed = [
+        t for i, t in enumerate(tools)
+        if columns[i % 4].checkbox(t, value=t in approved["allowed_tools"], key=f"pg-allow-{t}")
+    ]
+    mutating = st.multiselect("Tools that change something", tools, default=approved["mutating_tools"], key="pg-mutating")
+    mutations_allowed = st.checkbox("Changes allowed in this run", value=approved["mutations_allowed"], key="pg-changes")
+    kinds = {}
+    if mutating:
+        st.markdown("**How each change can be undone**")
+        columns = st.columns(len(mutating))
+        for column, tool in zip(columns, mutating):
+            decl = approved["reversibility"].get(tool)
+            default = decl["kind"] if decl else "undeclared"
+            kinds[tool] = column.selectbox(tool, KIND_CHOICES, index=KIND_CHOICES.index(default), key=f"pg-kind-{tool}")
+    rule_on = st.checkbox("Limit `send_email` recipients to these domains", value=False, key="pg-rule")
+    domain_text = st.text_input("Allowed domains, comma-separated", "tallowlane.example", max_chars=300, key="pg-domains")
+    mode = st.radio("Mode", ["observe", "enforce"], horizontal=True, key="pg-mode")
+
+    st.subheader("2. The script")
+    scenario = st.selectbox(
+        "Starting scenario", [s for s in SCENARIO_LABELS if s != "replay"], format_func=SCENARIO_LABELS.get, key="pg-scenario"
+    )
+    script = demo.SCENARIOS[scenario][2]
+    enabled = [
+        st.checkbox(f"{i}. `{describe_call(tool, args)}`", value=True, key=f"pg-step-{scenario}-{i}")
+        for i, (tool, args) in enumerate(script, 1)
+    ]
+    sends = [args["to"] for tool, args in script if tool == "send_email"]
+    recipient = st.text_input("Recipient for every `send_email` call", sends[0], max_chars=200, key=f"pg-to-{scenario}") if sends else None
+
+    if not st.button("Run the edited test", type="primary", key="pg-run"):
+        return
+    try:
+        domains = parse_domains(domain_text) if rule_on else None
+        to = parse_address(recipient) if recipient is not None else None
+    except ValueError as error:
+        st.error(f"Not run. {error}")
+        return
+    scope = build_scope(allowed, mutating, mutations_allowed, kinds, domains)
+    steps = [(t, {**a, "to": to} if t == "send_email" else a) for (t, a), on in zip(script, enabled) if on]
+    st.session_state["pg-scope"] = scope
+    with tempfile.TemporaryDirectory() as tmp:
+        edited_dir, approved_dir = Path(tmp, "edited"), Path(tmp, "approved")
+        result = execute(scope, mode, steps, demo.EMAILS, f"inbox-assistant (playground, {mode} mode)", str(edited_dir))
+        execute(demo.SCOPE, mode, steps, demo.EMAILS, f"inbox-assistant (approved scope, {mode} mode)", str(approved_dir))
+        comparison = compare(approved_dir, edited_dir)
+        comparison = comparison.replace(approved_dir.as_posix(), "approved scope").replace(edited_dir.as_posix(), "edited scope")
+
+    st.subheader("3. What the harness did")
+    edited_print, approved_print = fingerprint(scope.to_dict()), fingerprint(approved)
+    if edited_print != approved_print:
+        st.warning(
+            f"Changed scope: fingerprint `{edited_print[:12]}` is not the approved version `{approved_print[:12]}`. "
+            "Until someone approves this version, every run under it reports that no one approved it."
+        )
+    else:
+        st.success(f"Unchanged scope: this is the approved version, fingerprint `{approved_print[:12]}`.")
+    show_result(result)
+    st.subheader("The edited scope as a file")
+    st.caption(f"Fingerprint (SHA-256): {edited_print}")
+    st.code(scope_toml(scope, domains), language="toml")
+    st.subheader("Compared with the approved scope")
+    st.caption("The same script under the approved scope (A) and the edited one (B), in the same mode.")
+    flagged = comparison.split("## Material behavior changes (heuristic)")[1].split("\n## ")[0]
+    flags = [line[2:] for line in flagged.strip().splitlines() if line.startswith("- ")]
+    for flag in flags:
+        st.warning(flag)
+    if not flags:
+        st.info("No material behavior change flagged between the two runs.")
+    with st.expander("The full comparison"):
+        st.markdown(comparison)
+
+
 # -- layout ---------------------------------------------------------------
 
 st.set_page_config(page_title="Agent Accountability Harness", layout="wide")
@@ -349,4 +554,5 @@ st.sidebar.caption(f"Governance checks use the demo date, {demo.DEMO_DATE}.")
     "Change comparison": page_compare,
     "Findings": page_findings,
     "Tamper check": page_tamper,
+    "Build your own test": page_playground,
 }[page]()
