@@ -203,7 +203,7 @@ Because the model never attempted the send, **no real-model run exercised flaggi
 - The audit log is **tamper-evident, not tamper-proof**: the hash chain detects edits but does not prevent them, and it misses a full rewrite or lines cut from the end unless the final hash is kept elsewhere. The log can contain message text and should be treated as sensitive. Arguments and results are truncated (500 characters by default), but there is no redaction option.
 - Governance fields are recorded text, not verified approvals. The change comparison is a heuristic over counts.
 - The harness never undoes anything, and it does not check that a declared undo works.
-- `allowed_data_sources` is recorded but not checked.
+- `allowed_data_sources` is recorded but not checked. Enforcing declared data sources is planned for a future release.
 - `wrap` supports synchronous functions only. The LangChain adapter's blocking is tested for `invoke` and `ainvoke` on `langchain-core` 1.6.12, and it does not fill in default values before argument rules.
 - It does not detect prompt injection. It checks calls against a scope, and a scope is only as good as the person who writes it.
 
@@ -214,6 +214,8 @@ py -m venv .venv
 .venv/Scripts/python -m pip install -e ".[langchain,test]"
 .venv/Scripts/python -m pytest          # all tests run offline; none calls a model
 ```
+
+The suite collects 238 tests with the langchain extra installed (217 without it); the app tests also need Streamlit installed to run rather than skip. All tests run offline; none calls a model.
 
 The core package is about 1,300 lines in `src/accountability_harness/`. Running the real-model suite needs `pip install -e ".[experiments]"` and `ANTHROPIC_API_KEY` set in your terminal. `python experiments/run_suite.py` prints the plan and cost estimate without calling the API.
 
