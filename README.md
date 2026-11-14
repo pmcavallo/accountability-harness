@@ -219,6 +219,13 @@ The suite collects 238 tests with the langchain extra installed (217 without it)
 
 The core package is about 1,300 lines in `src/accountability_harness/`. Running the real-model suite needs `pip install -e ".[experiments]"` and `ANTHROPIC_API_KEY` set in your terminal. `python experiments/run_suite.py` prints the plan and cost estimate without calling the API.
 
+## Assessments
+
+Vendor assessments run under Module C of the agent assurance framework: an inventory first, six dimensions scored against published evidence with undocumented items scored adverse, change events worked through a closure procedure, and a POC plan whose success criteria are registered before any pilot runs.
+
+- [2026-11-14: Anthropic / Claude API](assessments/2026-11-14-anthropic/) — support-ticket summarizer and reply-drafter intake. Gate 1 scores 3, 3, 4, 3, 3, 2 (weakest link: operational posture). Recommendation: conditional go to pilot.
+
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
